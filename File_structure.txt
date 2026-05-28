@@ -1,0 +1,114 @@
+food-delivery-platform/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                  # lint, test, build on PR
+│       └── deploy.yml              # push to main → K3s deploy
+│
+├── k8s/                            # K3s manifests
+│   ├── namespace.yaml
+│   ├── kafka/
+│   │   ├── kafka-deployment.yaml
+│   │   └── zookeeper-deployment.yaml
+│   ├── postgres/
+│   │   └── postgres-deployment.yaml
+│   ├── api-gateway/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── order-orchestrator/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── payment-service/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── restaurant-service/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   └── delivery-service/
+│       ├── deployment.yaml
+│       └── service.yaml
+│
+├── packages/
+│   └── shared/                     # shared TS types & Kafka event schemas
+│       ├── src/
+│       │   ├── events.ts           # OrderPlaced, PaymentSuccessful, etc.
+│       │   └── types.ts
+│       ├── package.json
+│       └── tsconfig.json
+│
+├── services/
+│   │
+│   ├── api-gateway/
+│   │   ├── src/
+│   │   │   ├── app.ts
+│   │   │   ├── routes/
+│   │   │   │   └── orders.ts
+│   │   │   └── middleware/
+│   │   │       ├── auth.ts
+│   │   │       └── rateLimiter.ts
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── order-orchestrator/
+│   │   ├── src/
+│   │   │   ├── app.ts
+│   │   │   ├── orchestrator/
+│   │   │   │   ├── OrderSaga.ts        # core saga state machine
+│   │   │   │   └── SagaStep.ts
+│   │   │   ├── kafka/
+│   │   │   │   ├── producer.ts
+│   │   │   │   └── consumer.ts
+│   │   │   └── prisma/
+│   │   │       └── schema.prisma       # order_db schema
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── payment-service/
+│   │   ├── src/
+│   │   │   ├── app.ts
+│   │   │   ├── handlers/
+│   │   │   │   ├── chargePayment.ts
+│   │   │   │   └── refundPayment.ts
+│   │   │   ├── kafka/
+│   │   │   │   ├── producer.ts
+│   │   │   │   └── consumer.ts
+│   │   │   └── prisma/
+│   │   │       └── schema.prisma       # payment_db schema
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── restaurant-service/
+│   │   ├── src/
+│   │   │   ├── app.ts
+│   │   │   ├── handlers/
+│   │   │   │   ├── confirmOrder.ts
+│   │   │   │   └── rejectOrder.ts
+│   │   │   ├── kafka/
+│   │   │   │   ├── producer.ts
+│   │   │   │   └── consumer.ts
+│   │   │   └── prisma/
+│   │   │       └── schema.prisma       # restaurant_db schema
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── delivery-service/
+│       ├── src/
+│       │   ├── app.ts
+│       │   ├── handlers/
+│       │   │   └── assignRider.ts
+│       │   ├── kafka/
+│       │   │   ├── producer.ts
+│       │   │   └── consumer.ts
+│       │   └── prisma/
+│       │       └── schema.prisma       # delivery_db schema
+│       ├── Dockerfile
+│       ├── package.json
+│       └── tsconfig.json
+│
+├── docker-compose.yml              # local dev (kafka + postgres + all services)
+├── .env.example
+├── turbo.json                      # Turborepo config (monorepo build cache)
+└── package.json                    # root workspace
