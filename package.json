@@ -1,21 +1,20 @@
 {
-  "name": "food_delivery_app",
+  "name": "food-delivery-platform",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/subhamdas29/food_delivery_app.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/subhamdas29/food_delivery_app/issues"
-  },
-  "homepage": "https://github.com/subhamdas29/food_delivery_app#readme"
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
+  }
 }
