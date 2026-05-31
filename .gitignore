@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+*.tsbuildinfo
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# test coverage
+coverage/
+
+# turbo cache
+.turbo/
+
+# docker volumes
+postgres-data/
