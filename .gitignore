@@ -31,3 +31,5 @@ coverage/
 
 # docker volumes
 postgres-data/
+
+personal_documentation.docx
