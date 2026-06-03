@@ -1,0 +1,77 @@
+generator client{
+    provider = "prisma-client-js"
+}
+
+datasource db{
+    provider = "postgresql"
+    url = env("ORDER_DATABASE_URL")
+}
+
+// Tracks every order and its current saga position.
+// This is the source of truth for the orchestrator — if it crashes
+// and restarts, it reads this table and resumes from last known state.
+model Order {
+    id              String      @id @default(uuid())
+    userId          String  
+    restaurantId    String
+    totalAmount     Int
+    currency        String      @default("INR") 
+    status          OrderStatus @default(PENDING)
+    createdAt       DateTime    @default(now())
+    updatedAt       DateTime    @updatedAt
+    completedAt     DateTime?
+    sagaState       SagaState?
+    sagaSteps       SagaStepLog[]
+}
+
+model SagaState{
+    id              String      @id @default(uuid())
+    orderId         String      @unique
+    currentStep     SagaStep
+    status          SagaStatus  @default(RUNNING)
+    currentEventPayload    Json?
+    failureReason   String
+    createdAt       DateTime    @default(now())
+    updatedAt       DateTime    @updatedAt
+    order           Order       @relation(fields: [orderId], references: [id])
+
+}
+
+
+model SagaStepLog{
+    id          String      @id @default(uuid())
+    orderId     String
+    step        SagaStep
+    status      String      // "STARTED" | "SUCCEEDED" | "FAILED" | "COMPENSATING"
+    payload     Json?
+    createdAt   DateTime    @default(now())
+
+    order       Order       @relation(fields: [orderId], references: [id])
+}
+
+
+enum OrderStatus {
+  PENDING
+  PAYMENT_PROCESSING
+  PAYMENT_SUCCESS
+  RESTAURANT_CONFIRMING
+  RIDER_ASSIGNING
+  COMPLETED
+  COMPENSATING
+  REFUND_ISSUED
+  FAILED
+}
+
+enum SagaStep {
+  PAYMENT
+  RESTAURANT_CONFIRMATION
+  RIDER_ASSIGNMENT
+  COMPLETED
+  ROLLBACK_PAYMENT
+}
+
+enum SagaStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
