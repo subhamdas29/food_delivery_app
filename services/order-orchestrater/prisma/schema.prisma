@@ -30,7 +30,7 @@ model SagaState{
     currentStep     SagaStep
     status          SagaStatus  @default(RUNNING)
     currentEventPayload    Json?
-    failureReason   String
+    failureReason   String?
     createdAt       DateTime    @default(now())
     updatedAt       DateTime    @updatedAt
     order           Order       @relation(fields: [orderId], references: [id])

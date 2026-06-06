@@ -30,10 +30,11 @@ export async function connectConsumer(
   }
 
   await consumer.run({
+    eachMessage: async (payload: EachMessagePayload) => {    
     // Process one message at a time per partition — critical for saga
     // correctness. We must not process two events for the same order
     // concurrently or the state machine can enter an invalid state.
-    eachMessage: async (payload: EachMessagePayload) => {
+    
       const { topic, partition, message } = payload;
 
       if (!message.value) {
@@ -57,9 +58,6 @@ export async function connectConsumer(
       try {
         await onMessage(event);
       } catch (err) {
-        // Log but don't throw — throwing here crashes the consumer
-        // and stops ALL message processing. Dead-letter queues would
-        // go here in production.
         console.error(`[Consumer] Error handling ${event.type}:`, err);
       }
     },
