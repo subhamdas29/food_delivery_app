@@ -86,7 +86,7 @@ async function shutdown() {
   process.exit(0);
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown); // Signal Terminate; triggered by automated systems like docker, kubernetes, AWS
+process.on('SIGINT', shutdown); // Signal Interrupt; triggered by ctrl+c
 
 start();
