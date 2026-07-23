@@ -33,3 +33,5 @@ coverage/
 postgres-data/
 
 personal_documentation.docx
+
+k8s/secrets.yaml
