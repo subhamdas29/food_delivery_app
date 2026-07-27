@@ -1,0 +1,168 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+# Cancel any in-progress deploy if a new push arrives
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  # ── Job 1: Build & push all Docker images in parallel ────────
+  build:
+    name: Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service: api-gateway
+            context: .
+            dockerfile: services/api-gateway/Dockerfile
+            port: 3000
+
+          - service: order-orchestrator
+            context: .
+            dockerfile: services/order-orchestrator/Dockerfile
+            port: 3001
+
+          - service: payment-service
+            context: .
+            dockerfile: services/payment-service/Dockerfile
+            port: 3002
+
+          - service: restaurant-service
+            context: .
+            dockerfile: services/restaurant-service/Dockerfile
+            port: 3003
+
+          - service: delivery-service
+            context: .
+            dockerfile: services/delivery-service/Dockerfile
+            port: 3004
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Login to GHCR ─────────────────────────────────────────
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Set up Docker Buildx (enables layer caching) ─────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Extract metadata for image tags ──────────────────────
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # ── Build and push ────────────────────────────────────────
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache layers between builds — saves 2-3 minutes per service
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 2: Deploy to K3s after all images are built ──────────
+  deploy:
+    name: Deploy to K3s
+    runs-on: ubuntu-latest
+    needs: build   # only runs if ALL build jobs succeed
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Set up kubectl ────────────────────────────────────────
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+
+      # ── Configure kubeconfig from GitHub Secret ───────────────
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      # ── Verify cluster is reachable ───────────────────────────
+      - name: Verify cluster connection
+        run: kubectl get nodes
+
+      # ── Rolling update — each service gets the new SHA image ──
+      - name: Deploy api-gateway
+        run: |
+          kubectl set image deployment/api-gateway \
+            api-gateway=${{ env.IMAGE_PREFIX }}/api-gateway:${{ github.sha }} \
+            -n food-delivery
+          kubectl rollout status deployment/api-gateway -n food-delivery --timeout=120s
+
+      - name: Deploy order-orchestrator
+        run: |
+          kubectl set image deployment/order-orchestrator \
+            order-orchestrator=${{ env.IMAGE_PREFIX }}/order-orchestrator:${{ github.sha }} \
+            -n food-delivery
+          kubectl rollout status deployment/order-orchestrator -n food-delivery --timeout=120s
+
+      - name: Deploy payment-service
+        run: |
+          kubectl set image deployment/payment-service \
+            payment-service=${{ env.IMAGE_PREFIX }}/payment-service:${{ github.sha }} \
+            -n food-delivery
+          kubectl rollout status deployment/payment-service -n food-delivery --timeout=120s
+
+      - name: Deploy restaurant-service
+        run: |
+          kubectl set image deployment/restaurant-service \
+            restaurant-service=${{ env.IMAGE_PREFIX }}/restaurant-service:${{ github.sha }} \
+            -n food-delivery
+          kubectl rollout status deployment/restaurant-service -n food-delivery --timeout=120s
+
+      - name: Deploy delivery-service
+        run: |
+          kubectl set image deployment/delivery-service \
+            delivery-service=${{ env.IMAGE_PREFIX }}/delivery-service:${{ github.sha }} \
+            -n food-delivery
+          kubectl rollout status deployment/delivery-service -n food-delivery --timeout=120s
+
+      # ── Final health check ────────────────────────────────────
+      - name: Verify all pods running
+        run: kubectl get pods -n food-delivery
+
+      - name: Health check gateway
+        run: |
+          EC2_IP="${{ secrets.EC2_PUBLIC_IP }}"
+          curl --retry 5 --retry-delay 5 --fail \
+            http://${EC2_IP}:30000/health
