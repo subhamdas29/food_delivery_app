@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint, Typecheck & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Setup pnpm ───────────────────────────────────────────
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      # ── Setup Node ───────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # ── Install dependencies ─────────────────────────────────
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Turborepo cache ──────────────────────────────────────
+      - name: Cache Turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ github.sha }}
+          restore-keys: |
+            turbo-
+
+      # ── Build shared first (all services depend on it) ───────
+      - name: Build shared package
+        run: pnpm --filter @food-delivery/shared build
+
+      # ── Typecheck all services in parallel ───────────────────
+      - name: Typecheck
+        run: pnpm turbo run typecheck
+
+      # ── Build all services in parallel ───────────────────────
+      - name: Build
+        run: pnpm turbo run build
+
+      # ── Test all services ────────────────────────────────────
+      - name: Test
+        run: pnpm turbo run test
+        env:
+          # Silence the KafkaJS partitioner warning in tests
+          KAFKAJS_NO_PARTITIONER_WARNING: 1

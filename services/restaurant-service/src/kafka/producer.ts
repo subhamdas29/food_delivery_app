@@ -1,4 +1,4 @@
-import { Kafka, Producer, ProducerRecord } from 'kafkajs';
+import { Kafka, Producer, ProducerRecord, Partitioners } from 'kafkajs';
 import { AnyEvent } from '@food-delivery/shared';
 
 let producer: Producer | null = null;
@@ -9,7 +9,9 @@ const kafka = new Kafka({
 });
 
 export async function connectProducer(): Promise<void> {
-  producer = kafka.producer();
+  producer = kafka.producer({
+    createPartitioner: Partitioners.LegacyPartitioner, 
+  });
   await producer.connect();
   console.log('[Restaurant:Producer] Connected to Kafka');
 }
