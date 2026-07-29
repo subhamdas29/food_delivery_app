@@ -1,11 +1,10 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
 RUN npm install -g pnpm
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json ./
-COPY tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY services/delivery-service ./services/delivery-service
 
@@ -13,24 +12,6 @@ RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @food-delivery/shared build
 RUN cd services/delivery-service && npx prisma generate
 RUN pnpm --filter @food-delivery/delivery-service build
-
-
-FROM node:20-alpine AS runtime
-
-WORKDIR /app
-
-RUN npm install -g pnpm
-
-COPY package.json pnpm-workspace.yaml ./
-COPY packages/shared/package.json ./packages/shared/
-COPY services/delivery-service/package.json ./services/delivery-service/
-
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/services/delivery-service/dist ./services/delivery-service/dist
-COPY --from=builder /app/services/delivery-service/src/generated ./services/delivery-service/src/generated
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/services/delivery-service/node_modules ./services/delivery-service/node_modules
-COPY --from=builder /app/services/delivery-service/prisma ./services/delivery-service/prisma
 
 WORKDIR /app/services/delivery-service
 
