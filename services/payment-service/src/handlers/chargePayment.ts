@@ -1,4 +1,4 @@
-import { PrismaClient, TransactionStatus, TransactionType } from '@prisma/client';
+import { PrismaClient, TransactionStatus, TransactionType } from '../generated/client';
 import { ChargePayment, PaymentSuccessful, PaymentFailed } from '@food-delivery/shared';
 import { publishEvent } from '../kafka/producer';
 

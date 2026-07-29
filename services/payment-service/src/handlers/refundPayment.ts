@@ -1,4 +1,4 @@
-import { PrismaClient, TransactionStatus, TransactionType, RefundStatus } from '@prisma/client';
+import { PrismaClient, TransactionStatus, TransactionType, RefundStatus } from '../generated/client';
 import { RefundPayment, PaymentRefunded } from '@food-delivery/shared';
 import { publishEvent } from '../kafka/producer';
 
