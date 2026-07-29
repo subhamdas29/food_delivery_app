@@ -32,6 +32,10 @@ coverage/
 # docker volumes
 postgres-data/
 
+# prisma generated clients
+generated/
+**/generated/
+
 personal_documentation.docx
 
 k8s/secrets.yaml

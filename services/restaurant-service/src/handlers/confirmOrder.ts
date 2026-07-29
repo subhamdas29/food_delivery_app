@@ -1,4 +1,4 @@
-import { PrismaClient, RestaurantOrderStatus } from '@prisma/client';
+import { PrismaClient, RestaurantOrderStatus } from '../generated/client';
 import { ConfirmOrder, OrderConfirmed } from '@food-delivery/shared';
 import { publishEvent } from '../kafka/producer';
 

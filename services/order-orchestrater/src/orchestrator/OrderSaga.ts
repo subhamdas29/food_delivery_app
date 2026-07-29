@@ -1,4 +1,4 @@
-import { PrismaClient, SagaStep, OrderStatus, SagaStatus } from "@prisma/client";
+import { PrismaClient, SagaStep, OrderStatus, SagaStatus } from "../generated/client";
 import {
     AnyEvent,
     OrderPlaced,
@@ -41,19 +41,22 @@ export async function handleEvent(event: AnyEvent): Promise<void> {
         case "RiderAssignmentFailed":
             return onRiderAssignmentFailed(event);
         default:
-            console.log("[Saga] Ignoring event type: ${(event as AnyEvent).type}");
+            console.log(`[Saga] Ignoring event type: ${(event as AnyEvent).type}`);
     }
 }
 
 // Order Placed
 
 async function onOrderPlaced(event: OrderPlaced):Promise<void>{ //first we will check for idempotency then will update the order 
-    console.log("[Saga] OrderPlaced → starting saga for order ${event.orderId}");
+    console.log(`[Saga] OrderPlaced → starting saga for order ${event.orderId}`);
 
     const existing = await prisma.order.findUnique({
         where :{id: event.orderId},
     });
-    if(existing){console.warn("[Saga] Order ${event.orderId} already exists — skipping");}
+    if(existing){
+        console.warn(`[Saga] Order ${event.orderId} already exists — skipping`);
+        return;
+    }
 
     await prisma.$transaction(async (tx)=>{ //order & sagastep created in same transaction
         await tx.order.create({
@@ -84,7 +87,7 @@ async function onOrderPlaced(event: OrderPlaced):Promise<void>{ //first we will 
         });
     });
 
-    await executeRestaurantStep(event);
+    await executePaymentStep(event);
 }
 
 //Payment successful
@@ -107,7 +110,7 @@ async function onPaymentSuccessful(event: PaymentSuccessful): Promise<void>{
            data: {status: OrderStatus.RESTAURANT_CONFIRMING},
         });
         await tx.sagaState.update({
-            where: {id: event.orderId},
+            where: {orderId: event.orderId},
             data:{currentStep: SagaStep.RESTAURANT_CONFIRMATION, currentEventPayload: event as object},
         });
         await tx.sagaStepLog.create({
@@ -147,7 +150,7 @@ async function onPaymentFailed(event: PaymentFailed): Promise<void>{
       data: {
         status: SagaStatus.FAILED,
         failureReason: event.reason,
-        lastEventPayload: event as object,
+        currentEventPayload: event as object,
       },
     });
 
@@ -166,7 +169,7 @@ async function onPaymentFailed(event: PaymentFailed): Promise<void>{
 
 async function onOrderConfirmed(event: OrderConfirmed): Promise<void>{
     console.log(`[Saga] OrderConfirmed → assigning rider for ${event.orderId}`);
-    const saga = getSagaOrWarn((event.orderId));
+    const saga = await getSagaOrWarn(event.orderId);
     if(!saga){return;}
     const order = await prisma.order.findUniqueOrThrow({
         where: {id: event.orderId},
@@ -189,7 +192,7 @@ async function onOrderConfirmed(event: OrderConfirmed): Promise<void>{
             },
         });
         await tx.sagaState.update({
-            where: {id: order.id},
+            where: {orderId: order.id},
             data: {currentStep: SagaStep.RIDER_ASSIGNMENT,
                 currentEventPayload: event as object
             },
@@ -220,7 +223,7 @@ async function onOrderRejected(event: OrderRejected): Promise<void>{
             data:{status: OrderStatus.COMPENSATING},
         });
         await tx.sagaState.update({
-            where: {id: order.id},
+            where: {orderId: order.id},
             data:{currentStep: SagaStep.ROLLBACK_PAYMENT,
                 status: SagaStatus.RUNNING,
                 failureReason: event.reason,
@@ -260,7 +263,7 @@ async function onRiderAssigned(event: RiderAssigned): Promise<void>{
             data: {
                 currentStep: SagaStep.COMPLETED,
                 status: SagaStatus.COMPLETED,
-                lastEventPayload: event as object,
+                currentEventPayload: event as object,
             },
         });
 
@@ -296,7 +299,7 @@ async function onRiderAssignmentFailed(event: RiderAssignmentFailed): Promise<vo
                 currentStep: SagaStep.ROLLBACK_PAYMENT,
                 status: SagaStatus.RUNNING,
                 failureReason: event.reason,
-                lastEventPayload: event as object,
+                currentEventPayload: event as object,
             },
         });
 
@@ -334,7 +337,7 @@ async function onPaymentRefunded(event: PaymentRefunded): Promise<void>{
             where: { orderId: event.orderId },
             data: {
                 status: SagaStatus.FAILED,
-                lastEventPayload: event as object,
+                currentEventPayload: event as object,
             },
         });
 
