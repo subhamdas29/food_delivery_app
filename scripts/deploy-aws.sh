@@ -3,15 +3,28 @@ set -e
 
 echo "🚀 Starting FoodRush AWS EC2 Deployment..."
 
-# 1. Enable 4GB Swap memory to prevent Out-Of-Memory (OOM) build process freezes
+# 1. Clean apt cache & allocate a balanced 1.5GB Swap file (to prevent disk full error on 8GB EBS)
+sudo apt-get clean
+sudo dpkg --configure -a || true
+
+if [ -f /swapfile ]; then
+  SWAP_SIZE=$(stat -c%s /swapfile 2>/dev/null || echo "0")
+  # If swapfile is larger than 2GB, shrink it to 1.5GB to free disk space
+  if [ "$SWAP_SIZE" -gt 2500000000 ]; then
+    echo "🧹 Shrinking oversized swapfile to 1.5GB to free disk space..."
+    sudo swapoff /swapfile || true
+    sudo rm -f /swapfile
+  fi
+fi
+
 if [ ! -f /swapfile ]; then
-  echo "🧠 Creating and enabling 4GB Swap space..."
-  sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+  echo "🧠 Creating 1.5GB Swap space..."
+  sudo dd if=/dev/zero of=/swapfile bs=1M count=1536
   sudo chmod 600 /swapfile
   sudo mkswap /swapfile
   sudo swapon /swapfile || true
   sudo sysctl vm.swappiness=60 || true
-  echo "✅ 4GB Swap memory enabled."
+  echo "✅ 1.5GB Swap memory enabled."
 else
   sudo swapon /swapfile || true
 fi
@@ -45,7 +58,7 @@ JWT_SECRET=production-secret-jwt-key-foodrush
 EOF
 
 # 5. Build images sequentially with memory limit
-echo "🔨 Building containers sequentially to conserve RAM..."
+echo "🔨 Building containers sequentially to conserve RAM & Disk..."
 export DOCKER_BUILDKIT=0
 
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build api-gateway
