@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/client';
 import { connectProducer, disconnectProducer } from './kafka/producer';
 import { connectConsumer, disconnectConsumer } from './kafka/consumer';
 import { handleAssignRider } from './handlers/assignRider';

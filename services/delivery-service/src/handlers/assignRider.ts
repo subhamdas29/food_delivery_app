@@ -1,4 +1,4 @@
-import { PrismaClient, DeliveryStatus } from '@prisma/client';
+import { PrismaClient, DeliveryStatus } from '../generated/client';
 import { AssignRider, RiderAssigned, RiderAssignmentFailed } from '@food-delivery/shared';
 import { publishEvent } from '../kafka/producer';
 
@@ -29,7 +29,7 @@ export async function handleAssignRider(event: AssignRider): Promise<void> {
     data: {
       orderId: event.orderId,
       status: DeliveryStatus.PENDING,
-      deliveryAddress: event.deliveryAddress,
+      deliveryAddress: event.deliveryAddress as any,
     },
   });
 
