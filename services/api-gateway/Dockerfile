@@ -2,26 +2,19 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-
 RUN npm install -g pnpm
 
-
-COPY package.json pnpm-workspace.yaml turbo.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json ./
 COPY tsconfig.base.json ./
 
-
 COPY packages/shared ./packages/shared
-
-
 COPY services/api-gateway ./services/api-gateway
 
-
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Build shared first, then the service
 RUN pnpm --filter @food-delivery/shared build
 RUN pnpm --filter @food-delivery/api-gateway build
-
 
 FROM node:20-alpine AS runtime
 

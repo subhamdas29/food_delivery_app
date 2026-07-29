@@ -2,21 +2,23 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install pnpm
+RUN npm install -g pnpm
 
 # Copy root monorepo files for pnpm workspace
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json ./
+COPY tsconfig.base.json ./
+COPY packages/shared ./packages/shared
 COPY frontend/package.json ./frontend/
-COPY packages ./packages
 
 # Install dependencies
-RUN pnpm install --filter frontend...
+RUN pnpm install --no-frozen-lockfile
 
-# Copy frontend source code
+# Copy frontend source code & shared package
 COPY frontend ./frontend
 
-# Build static assets
+# Build shared & frontend
+RUN pnpm --filter @food-delivery/shared build
 RUN pnpm --filter frontend build
 
 # Production stage using Nginx
