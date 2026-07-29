@@ -9,7 +9,6 @@ sudo dpkg --configure -a || true
 
 if [ -f /swapfile ]; then
   SWAP_SIZE=$(stat -c%s /swapfile 2>/dev/null || echo "0")
-  # If swapfile is larger than 2GB, shrink it to 1.5GB to free disk space
   if [ "$SWAP_SIZE" -gt 2500000000 ]; then
     echo "🧹 Shrinking oversized swapfile to 1.5GB to free disk space..."
     sudo swapoff /swapfile || true
@@ -29,10 +28,10 @@ else
   sudo swapon /swapfile || true
 fi
 
-# 2. Update system packages and install Docker + Docker Compose
+# 2. Update system packages and install Docker + Docker Compose plugin
 echo "📦 Installing Docker & system dependencies..."
 sudo apt-get update -y
-sudo apt-get install -y ca-certificates curl gnupg lsb-release
+sudo apt-get install -y ca-certificates curl gnupg lsb-release docker-compose-plugin docker-compose || true
 
 if ! command -v docker &> /dev/null; then
   sudo mkdir -p /etc/apt/keyrings
@@ -44,12 +43,19 @@ if ! command -v docker &> /dev/null; then
   echo "✅ Docker installed successfully."
 fi
 
-# 3. Fetch Public IP
+# 3. Detect docker compose binary
+if command -v docker-compose &> /dev/null; then
+  DC="sudo docker-compose"
+else
+  DC="sudo docker compose"
+fi
+
+# 4. Fetch Public IP
 PUBLIC_IP=$(curl -s http://checkip.amazonaws.com || curl -s ifconfig.me)
 echo "🌐 Detected EC2 Public IP: $PUBLIC_IP"
 
-# 4. Create .env file for Docker Compose
-cat <<EOF > .env.prod
+# 5. Create .env file for Docker Compose
+cat <<EOF > .env
 EC2_PUBLIC_IP=$PUBLIC_IP
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
@@ -57,30 +63,32 @@ POSTGRES_DB=postgres
 JWT_SECRET=production-secret-jwt-key-foodrush
 EOF
 
-# 5. Build images sequentially with memory limit
+cp .env .env.prod
+
+# 6. Build images sequentially with memory limit
 echo "🔨 Building containers sequentially to conserve RAM & Disk..."
 export DOCKER_BUILDKIT=0
 
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build api-gateway
+$DC -f docker-compose.prod.yml build api-gateway
 sleep 2
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build order-orchestrator
+$DC -f docker-compose.prod.yml build order-orchestrator
 sleep 2
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build payment-service
+$DC -f docker-compose.prod.yml build payment-service
 sleep 2
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build restaurant-service
+$DC -f docker-compose.prod.yml build restaurant-service
 sleep 2
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build delivery-service
+$DC -f docker-compose.prod.yml build delivery-service
 sleep 2
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build frontend
+$DC -f docker-compose.prod.yml build frontend
 
-# 6. Start containers
+# 7. Start containers
 echo "🚀 Starting all containers..."
-sudo docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+$DC -f docker-compose.prod.yml up -d
 
 echo "⏳ Waiting for database and Kafka to initialize..."
 sleep 15
 
-# 7. Push Prisma database schemas
+# 8. Push Prisma database schemas
 echo "🗄️ Initializing database tables via Prisma..."
 sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
 sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
