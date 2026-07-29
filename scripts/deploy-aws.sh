@@ -68,8 +68,8 @@ EOF
 
 cp .env .env.prod
 
-# 7. Build images sequentially with memory limit
-echo "🔨 Building containers sequentially..."
+# 7. Build images sequentially
+echo "🔨 Building containers..."
 export DOCKER_BUILDKIT=0
 
 $DC -f docker-compose.prod.yml build api-gateway
@@ -79,19 +79,30 @@ $DC -f docker-compose.prod.yml build restaurant-service
 $DC -f docker-compose.prod.yml build delivery-service
 $DC -f docker-compose.prod.yml build frontend
 
-# 8. Start containers
-echo "🚀 Starting all containers..."
-$DC -f docker-compose.prod.yml up -d
+# 8. Start Database & Kafka first
+echo "🚀 Starting Database & Kafka..."
+$DC -f docker-compose.prod.yml up -d postgres kafka kafka-init
 
-echo "⏳ Waiting for database and Kafka to initialize..."
+echo "⏳ Waiting 15 seconds for PostgreSQL databases to initialize..."
 sleep 15
 
-# 9. Push Prisma database schemas
+# 9. Start Microservices & Frontend
+echo "🚀 Starting Microservices & Frontend..."
+$DC -f docker-compose.prod.yml up -d
+
+echo "⏳ Waiting for microservices to connect..."
+sleep 10
+
+# 10. Push Prisma database schemas
 echo "🗄️ Initializing database tables via Prisma..."
 sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
 sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
 sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate || true
 sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate || true
+
+# 11. Restart microservices cleanly
+echo "🔄 Restarting microservices..."
+$DC -f docker-compose.prod.yml restart order-orchestrator payment-service restaurant-service delivery-service api-gateway
 
 echo "🎉 Deployment complete!"
 echo "🌐 Access your app at: http://$PUBLIC_IP"
