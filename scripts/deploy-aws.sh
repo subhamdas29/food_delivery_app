@@ -3,14 +3,17 @@ set -e
 
 echo "🚀 Starting FoodRush AWS EC2 Deployment..."
 
-# 1. Enable 4GB Swap memory to prevent Out-Of-Memory (OOM) build process kills
-if [ $(free -m | awk '/Swap:/ {print $2}') -lt 2000 ]; then
-  echo "🧠 Enabling 4GB Swap memory for EC2 build..."
-  sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+# 1. Enable 4GB Swap memory to prevent Out-Of-Memory (OOM) build process freezes
+if [ ! -f /swapfile ]; then
+  echo "🧠 Creating and enabling 4GB Swap space..."
+  sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
   sudo chmod 600 /swapfile
   sudo mkswap /swapfile
   sudo swapon /swapfile || true
+  sudo sysctl vm.swappiness=60 || true
   echo "✅ 4GB Swap memory enabled."
+else
+  sudo swapon /swapfile || true
 fi
 
 # 2. Update system packages and install Docker + Docker Compose
@@ -41,13 +44,20 @@ POSTGRES_DB=postgres
 JWT_SECRET=production-secret-jwt-key-foodrush
 EOF
 
-# 5. Build images sequentially to keep RAM usage low
+# 5. Build images sequentially with memory limit
 echo "🔨 Building containers sequentially to conserve RAM..."
+export DOCKER_BUILDKIT=0
+
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build api-gateway
+sleep 2
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build order-orchestrator
+sleep 2
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build payment-service
+sleep 2
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build restaurant-service
+sleep 2
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build delivery-service
+sleep 2
 sudo docker compose -f docker-compose.prod.yml --env-file .env.prod build frontend
 
 # 6. Start containers
