@@ -9,11 +9,16 @@ const kafka = new Kafka({
 });
 
 export async function connectProducer(): Promise<void> {
-  producer = kafka.producer({
-    createPartitioner: Partitioners.LegacyPartitioner, 
-  });
-  await producer.connect();
-  console.log('[Gateway:Producer] Connected to Kafka');
+  try {
+    producer = kafka.producer({
+      createPartitioner: Partitioners.LegacyPartitioner,
+    });
+    await producer.connect();
+    console.log('[Gateway:Producer] Connected to Kafka');
+  } catch (err) {
+    console.error('[Gateway:Producer] Initial connection failed:', err);
+    producer = null;
+  }
 }
 
 export async function disconnectProducer(): Promise<void> {
@@ -26,7 +31,14 @@ export async function publishEvent(
   event: AnyEvent,
   key: string
 ): Promise<void> {
-  if (!producer) throw new Error('Producer not connected');
+  if (!producer) {
+    console.log('[Gateway:Producer] Producer not connected, connecting now...');
+    await connectProducer();
+  }
+
+  if (!producer) {
+    throw new Error('Kafka producer is unavailable');
+  }
 
   const record: ProducerRecord = {
     topic,
@@ -42,6 +54,17 @@ export async function publishEvent(
     ],
   };
 
-  await producer.send(record);
-  console.log(`[Gateway:Producer] Published ${event.type} to ${topic}`);
+  try {
+    await producer.send(record);
+    console.log(`[Gateway:Producer] Published ${event.type} to ${topic}`);
+  } catch (err) {
+    console.error('[Gateway:Producer] Send error, attempting reconnect...', err);
+    await connectProducer();
+    if (producer) {
+      await producer.send(record);
+      console.log(`[Gateway:Producer] Published ${event.type} to ${topic} after reconnect`);
+    } else {
+      throw err;
+    }
+  }
 }
