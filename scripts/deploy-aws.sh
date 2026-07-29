@@ -3,32 +3,35 @@ set -e
 
 echo "🚀 Starting FoodRush AWS EC2 Deployment..."
 
-# 1. Clean apt cache & allocate a balanced 1.5GB Swap file (to prevent disk full error on 8GB EBS)
+# 1. Clean Docker system cache & apt cache to free disk space
+echo "🧹 Cleaning unused Docker cache & apt cache..."
+sudo docker system prune -af || true
 sudo apt-get clean
 sudo dpkg --configure -a || true
 
+# 2. Allocate a minimal 1GB Swap file to preserve disk space
 if [ -f /swapfile ]; then
   SWAP_SIZE=$(stat -c%s /swapfile 2>/dev/null || echo "0")
-  if [ "$SWAP_SIZE" -gt 2500000000 ]; then
-    echo "🧹 Shrinking oversized swapfile to 1.5GB to free disk space..."
+  if [ "$SWAP_SIZE" -gt 1200000000 ]; then
+    echo "🧹 Shrinking swapfile to 1GB to conserve disk space..."
     sudo swapoff /swapfile || true
     sudo rm -f /swapfile
   fi
 fi
 
 if [ ! -f /swapfile ]; then
-  echo "🧠 Creating 1.5GB Swap space..."
-  sudo dd if=/dev/zero of=/swapfile bs=1M count=1536
+  echo "🧠 Creating 1GB Swap space..."
+  sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
   sudo chmod 600 /swapfile
   sudo mkswap /swapfile
   sudo swapon /swapfile || true
   sudo sysctl vm.swappiness=60 || true
-  echo "✅ 1.5GB Swap memory enabled."
+  echo "✅ 1GB Swap memory enabled."
 else
   sudo swapon /swapfile || true
 fi
 
-# 2. Update system packages and install Docker + Docker Compose plugin
+# 3. Update system packages and install Docker + Docker Compose plugin
 echo "📦 Installing Docker & system dependencies..."
 sudo apt-get update -y
 sudo apt-get install -y ca-certificates curl gnupg lsb-release docker-compose-plugin docker-compose || true
@@ -43,18 +46,18 @@ if ! command -v docker &> /dev/null; then
   echo "✅ Docker installed successfully."
 fi
 
-# 3. Detect docker compose binary
+# 4. Detect docker compose binary
 if command -v docker-compose &> /dev/null; then
   DC="sudo docker-compose"
 else
   DC="sudo docker compose"
 fi
 
-# 4. Fetch Public IP
+# 5. Fetch Public IP
 PUBLIC_IP=$(curl -s http://checkip.amazonaws.com || curl -s ifconfig.me)
 echo "🌐 Detected EC2 Public IP: $PUBLIC_IP"
 
-# 5. Create .env file for Docker Compose
+# 6. Create .env file for Docker Compose
 cat <<EOF > .env
 EC2_PUBLIC_IP=$PUBLIC_IP
 POSTGRES_USER=postgres
@@ -65,30 +68,25 @@ EOF
 
 cp .env .env.prod
 
-# 6. Build images sequentially with memory limit
-echo "🔨 Building containers sequentially to conserve RAM & Disk..."
+# 7. Build images sequentially with memory limit
+echo "🔨 Building containers sequentially..."
 export DOCKER_BUILDKIT=0
 
 $DC -f docker-compose.prod.yml build api-gateway
-sleep 2
 $DC -f docker-compose.prod.yml build order-orchestrator
-sleep 2
 $DC -f docker-compose.prod.yml build payment-service
-sleep 2
 $DC -f docker-compose.prod.yml build restaurant-service
-sleep 2
 $DC -f docker-compose.prod.yml build delivery-service
-sleep 2
 $DC -f docker-compose.prod.yml build frontend
 
-# 7. Start containers
+# 8. Start containers
 echo "🚀 Starting all containers..."
 $DC -f docker-compose.prod.yml up -d
 
 echo "⏳ Waiting for database and Kafka to initialize..."
 sleep 15
 
-# 8. Push Prisma database schemas
+# 9. Push Prisma database schemas
 echo "🗄️ Initializing database tables via Prisma..."
 sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
 sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
