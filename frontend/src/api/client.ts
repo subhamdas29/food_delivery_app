@@ -1,0 +1,60 @@
+import axios from 'axios';
+import { PlaceOrderPayload, PlaceOrderResponse, OrderStatusResponse } from '../types';
+
+export const TOKEN_STORAGE_KEY = 'food_delivery_token';
+
+// Create Axios instance pointing to Vite dev proxy (/api)
+export const apiClient = axios.create({
+  baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Attach JWT token to every request
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Function to ensure dev authentication token is available
+export async function ensureAuthToken(): Promise<string> {
+  const existingToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (existingToken) {
+    return existingToken;
+  }
+
+  try {
+    const response = await axios.post<{ token: string }>('/api/dev/token', {
+      userId: 'user-123',
+    });
+    const token = response.data.token;
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      return token;
+    }
+    throw new Error('No token returned from dev token endpoint');
+  } catch (error) {
+    console.error('Failed to auto-fetch dev authentication token:', error);
+    throw error;
+  }
+}
+
+// API Methods
+export async function placeOrder(payload: PlaceOrderPayload): Promise<PlaceOrderResponse> {
+  await ensureAuthToken();
+  const response = await apiClient.post<PlaceOrderResponse>('/orders', payload);
+  return response.data;
+}
+
+export async function fetchOrderStatus(orderId: string): Promise<OrderStatusResponse> {
+  await ensureAuthToken();
+  const response = await apiClient.get<OrderStatusResponse>(`/orders/${orderId}/status`);
+  return response.data;
+}
