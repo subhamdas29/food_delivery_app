@@ -83,26 +83,30 @@ $DC -f docker-compose.prod.yml build restaurant-service
 $DC -f docker-compose.prod.yml build delivery-service
 $DC -f docker-compose.prod.yml build frontend
 
-# 8. Start all services
-echo "🚀 Starting Microservices, Postgres & Kafka..."
-$DC -f docker-compose.prod.yml up -d --force-recreate
+# 8. Start Database & Kafka first
+echo "🚀 Starting Database & Kafka..."
+$DC -f docker-compose.prod.yml up -d postgres kafka kafka-init
 
-echo "⏳ Waiting 15 seconds for PostgreSQL and containers to initialize..."
+echo "⏳ Waiting 15 seconds for PostgreSQL and Kafka to initialize..."
 sleep 15
 
 # 8.5. Force create PostgreSQL databases via psql
-echo "🗄️ Ensuring PostgreSQL databases exist (order_db, payment_db, restaurant_db, delivery_db)..."
+echo "🗄️ Ensuring PostgreSQL databases exist..."
 sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE order_db;" || true
 sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE payment_db;" || true
 sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE restaurant_db;" || true
 sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE delivery_db;" || true
 
-# 9. Push Prisma database schemas
+# 9. Push Prisma database schemas via dedicated standalone runner
 echo "🗄️ Creating database tables via Prisma..."
-sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate
-sudo docker exec foodrush-payment-service npx prisma db push --skip-generate
-sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate
-sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate
+sudo docker run --rm --network food_delivery_app_default -e ORDER_DATABASE_URL="postgresql://postgres:postgres@postgres:5432/order_db?schema=public" food_delivery_app-order-orchestrator npx prisma db push --skip-generate || true
+sudo docker run --rm --network food_delivery_app_default -e PAYMENT_DATABASE_URL="postgresql://postgres:postgres@postgres:5432/payment_db?schema=public" food_delivery_app-payment-service npx prisma db push --skip-generate || true
+sudo docker run --rm --network food_delivery_app_default -e RESTAURANT_DATABASE_URL="postgresql://postgres:postgres@postgres:5432/restaurant_db?schema=public" food_delivery_app-restaurant-service npx prisma db push --skip-generate || true
+sudo docker run --rm --network food_delivery_app_default -e DELIVERY_DATABASE_URL="postgresql://postgres:postgres@postgres:5432/delivery_db?schema=public" food_delivery_app-delivery-service npx prisma db push --skip-generate || true
+
+# 10. Start all microservices & frontend
+echo "🚀 Starting Microservices & Frontend..."
+$DC -f docker-compose.prod.yml up -d --force-recreate
 
 echo "🎉 Deployment complete!"
 echo "🌐 Access your app at: http://$PUBLIC_IP"

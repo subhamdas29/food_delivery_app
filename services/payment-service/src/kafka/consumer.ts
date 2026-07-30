@@ -11,41 +11,50 @@ const kafka = new Kafka({
 export async function connectConsumer(
   onMessage: (event: PaymentCommand) => Promise<void>
 ): Promise<void> {
-  consumer = kafka.consumer({
-    groupId: 'payment-service-group',
-  });
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    try {
+      consumer = kafka.consumer({
+        groupId: 'payment-service-group',
+      });
 
-  await consumer.connect();
-  await consumer.subscribe({ topic: 'payments.commands', fromBeginning: false });
+      await consumer.connect();
+      await consumer.subscribe({ topic: 'payments.commands', fromBeginning: false });
 
-  await consumer.run({
-    eachMessage: async (payload: EachMessagePayload) => {
-      const { topic, partition, message } = payload;
+      await consumer.run({
+        eachMessage: async (payload: EachMessagePayload) => {
+          const { topic, partition, message } = payload;
 
-      if (!message.value) {
-        console.warn(`[Payment:Consumer] Empty message on ${topic}:${partition}`);
-        return;
-      }
+          if (!message.value) {
+            console.warn(`[Payment:Consumer] Empty message on ${topic}:${partition}`);
+            return;
+          }
 
-      let event: PaymentCommand;
-      try {
-        event = JSON.parse(message.value.toString()) as PaymentCommand;
-      } catch (err) {
-        console.error('[Payment:Consumer] Failed to parse message:', err);
-        return;
-      }
+          let event: PaymentCommand;
+          try {
+            event = JSON.parse(message.value.toString()) as PaymentCommand;
+          } catch (err) {
+            console.error('[Payment:Consumer] Failed to parse message:', err);
+            return;
+          }
 
-      console.log(`[Payment:Consumer] Received ${event.type} (offset: ${message.offset})`);
+          console.log(`[Payment:Consumer] Received ${event.type} (offset: ${message.offset})`);
 
-      try {
-        await onMessage(event);
-      } catch (err) {
-        console.error(`[Payment:Consumer] Error handling ${event.type}:`, err);
-      }
-    },
-  });
+          try {
+            await onMessage(event);
+          } catch (err) {
+            console.error(`[Payment:Consumer] Error handling ${event.type}:`, err);
+          }
+        },
+      });
 
-  console.log('[Payment:Consumer] Listening on: payments.commands');
+      console.log('[Payment:Consumer] Listening on: payments.commands');
+      return;
+    } catch (err) {
+      console.warn(`[Payment:Consumer] Waiting for Kafka topics (attempt ${attempt}/15)...`);
+      await consumer?.disconnect().catch(() => {});
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
 }
 
 export async function disconnectConsumer(): Promise<void> {

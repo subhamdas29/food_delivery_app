@@ -8,7 +8,6 @@ const kafka = new Kafka({
   brokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
 });
 
-// Topics the orchestrator listens to
 const SUBSCRIBED_TOPICS = [
   'orders.lifecycle',
   'payments.events',
@@ -19,51 +18,56 @@ const SUBSCRIBED_TOPICS = [
 export async function connectConsumer(
   onMessage: (event: AnyEvent) => Promise<void>
 ): Promise<void> {
-  consumer = kafka.consumer({
-    groupId: 'order-orchestrator-group',
-  });
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    try {
+      consumer = kafka.consumer({
+        groupId: 'order-orchestrator-group',
+      });
 
-  await consumer.connect();
+      await consumer.connect();
 
-  for (const topic of SUBSCRIBED_TOPICS) {
-    await consumer.subscribe({ topic, fromBeginning: false });
+      for (const topic of SUBSCRIBED_TOPICS) {
+        await consumer.subscribe({ topic, fromBeginning: false });
+      }
+
+      await consumer.run({
+        eachMessage: async (payload: EachMessagePayload) => {
+          const { topic, partition, message } = payload;
+
+          if (!message.value) {
+            console.warn(`[Consumer] Empty message on ${topic}:${partition}`);
+            return;
+          }
+
+          let event: AnyEvent;
+          try {
+            event = JSON.parse(message.value.toString()) as AnyEvent;
+          } catch (err) {
+            console.error('[Consumer] Failed to parse message:', err);
+            return;
+          }
+
+          console.log(
+            `[Consumer] Received ${event.type} from ${topic} ` +
+            `(partition: ${partition}, offset: ${message.offset})`
+          );
+
+          try {
+            await onMessage(event);
+          } catch (err) {
+            console.error(`[Consumer] Error handling ${event.type}:`, err);
+          }
+        },
+      });
+
+      console.log('[Consumer] Listening on:', SUBSCRIBED_TOPICS.join(', '));
+      return;
+    } catch (err) {
+      console.warn(`[Consumer] Kafka topics initializing (attempt ${attempt}/15)...`);
+      await consumer?.disconnect().catch(() => {});
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   }
-
-  await consumer.run({
-    eachMessage: async (payload: EachMessagePayload) => {    
-    // Process one message at a time per partition — critical for saga
-    // correctness. We must not process two events for the same order
-    // concurrently or the state machine can enter an invalid state.
-    
-      const { topic, partition, message } = payload;
-
-      if (!message.value) {
-        console.warn(`[Consumer] Empty message on ${topic}:${partition}`);
-        return;
-      }
-
-      let event: AnyEvent;
-      try {
-        event = JSON.parse(message.value.toString()) as AnyEvent;
-      } catch (err) {
-        console.error('[Consumer] Failed to parse message:', err);
-        return;
-      }
-
-      console.log(
-        `[Consumer] Received ${event.type} from ${topic} ` +
-        `(partition: ${partition}, offset: ${message.offset})`
-      );
-
-      try {
-        await onMessage(event);
-      } catch (err) {
-        console.error(`[Consumer] Error handling ${event.type}:`, err);
-      }
-    },
-  });
-
-  console.log('[Consumer] Listening on:', SUBSCRIBED_TOPICS.join(', '));
 }
 
 export async function disconnectConsumer(): Promise<void> {
