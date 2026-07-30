@@ -87,15 +87,22 @@ $DC -f docker-compose.prod.yml build frontend
 echo "🚀 Starting Microservices, Postgres & Kafka..."
 $DC -f docker-compose.prod.yml up -d --force-recreate
 
-echo "⏳ Waiting 15 seconds for containers to initialize..."
+echo "⏳ Waiting 15 seconds for PostgreSQL and containers to initialize..."
 sleep 15
 
+# 8.5. Force create PostgreSQL databases via psql
+echo "🗄️ Ensuring PostgreSQL databases exist (order_db, payment_db, restaurant_db, delivery_db)..."
+sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE order_db;" || true
+sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE payment_db;" || true
+sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE restaurant_db;" || true
+sudo docker exec foodrush-postgres psql -U postgres -c "CREATE DATABASE delivery_db;" || true
+
 # 9. Push Prisma database schemas
-echo "🗄️ Initializing database tables via Prisma..."
-sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
-sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
-sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate || true
-sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate || true
+echo "🗄️ Creating database tables via Prisma..."
+sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate
+sudo docker exec foodrush-payment-service npx prisma db push --skip-generate
+sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate
+sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate
 
 echo "🎉 Deployment complete!"
 echo "🌐 Access your app at: http://$PUBLIC_IP"
