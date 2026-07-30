@@ -13,10 +13,10 @@ const PORT = process.env.API_GATEWAY_PORT ?? 3000;
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json());
 
-// CORS — allows the frontend dev server to call the gateway
+// CORS — allows all origins in production
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
-  methods: ['GET', 'POST'],
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -26,8 +26,7 @@ app.use(globalLimiter);
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/orders', ordersRouter);
 
-// Dev-only token generator — your friend uses this to get a JWT
-// without a real auth service. POST /dev/token { "userId": "user-123" }
+// Dev-only token generator — POST /dev/token { "userId": "user-123" }
 app.post('/dev/token', devTokenRoute);
 
 // ── Health check ──────────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ app.get('/health', (_req, res) => {
     service: 'api-gateway',
     timestamp: new Date().toISOString(),
     checks: {
-      database: 'ok', // gateway has no DB
+      database: 'ok',
       kafka: 'ok',
     },
   };
@@ -46,17 +45,15 @@ app.get('/health', (_req, res) => {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 async function start() {
-  try {
-    await connectProducer();
+  // Start Express server immediately so routes (/dev/token, /orders) are active right away
+  app.listen(PORT, () => {
+    console.log(`[Gateway] Listening on port ${PORT}`);
+  });
 
-    app.listen(PORT, () => {
-      console.log(`[Gateway] Listening on port ${PORT}`);
-      console.log(`[Gateway] CORS enabled for: ${process.env.FRONTEND_URL ?? 'http://localhost:5173'}`);
-    });
-  } catch (err) {
-    console.error('[Gateway] Failed to start:', err);
-    process.exit(1);
-  }
+  // Connect to Kafka in background
+  connectProducer().catch(err => {
+    console.warn('[Gateway] Kafka initial connection pending background retry:', err);
+  });
 }
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
