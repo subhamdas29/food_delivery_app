@@ -54,18 +54,16 @@ async function connectDbWithRetry(retries = 15, delayMs = 3000): Promise<void> {
 }
 
 async function start() {
+  app.listen(PORT, () => {
+    console.log(`[Delivery] Listening on port ${PORT}`);
+  });
+
   try {
     await connectDbWithRetry();
-
     await connectProducer();
     await connectConsumer(handleMessage);
-
-    app.listen(PORT, () => {
-      console.log(`[Delivery] Listening on port ${PORT}`);
-    });
   } catch (err) {
-    console.error('[Delivery] Failed to start:', err);
-    process.exit(1);
+    console.error('[Delivery] Background initialization warning:', err);
   }
 }
 

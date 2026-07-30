@@ -89,18 +89,17 @@ async function connectDbWithRetry(retries = 15, delayMs = 3000): Promise<void> {
 }
 
 async function start() {
+  // Start Express HTTP server FIRST so port 3001 listens immediately
+  app.listen(PORT, () => {
+    console.log(`[Orchestrator] Listening on port ${PORT}`);
+  });
+
   try {
     await connectDbWithRetry();
-
     await connectProducer();
     await connectConsumer(handleEvent);
-
-    app.listen(PORT, () => {
-      console.log(`[Orchestrator] Listening on port ${PORT}`);
-    });
   } catch (err) {
-    console.error('[Orchestrator] Failed to start:', err);
-    process.exit(1);
+    console.error('[Orchestrator] Background initialization warning:', err);
   }
 }
 
