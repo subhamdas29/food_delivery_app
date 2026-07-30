@@ -3,6 +3,10 @@ set -e
 
 echo "🚀 Starting FoodRush AWS EC2 Deployment..."
 
+# 0. Stop and disable host Nginx service (prevents port 80 conflict with Docker frontend)
+sudo systemctl stop nginx || true
+sudo systemctl disable nginx || true
+
 # 1. Clean Docker system cache & apt cache to free disk space
 echo "🧹 Cleaning unused Docker cache & apt cache..."
 sudo docker system prune -af || true
@@ -88,7 +92,7 @@ sleep 15
 
 # 9. Start Microservices & Frontend
 echo "🚀 Starting Microservices & Frontend..."
-$DC -f docker-compose.prod.yml up -d
+$DC -f docker-compose.prod.yml up -d --force-recreate
 
 echo "⏳ Waiting for microservices to connect..."
 sleep 10
