@@ -90,23 +90,16 @@ $DC -f docker-compose.prod.yml up -d postgres kafka kafka-init
 echo "⏳ Waiting 15 seconds for PostgreSQL databases to initialize..."
 sleep 15
 
-# 9. Start Microservices & Frontend
+# 9. Initialize database tables via Prisma before starting service containers
+echo "🗄️ Initializing database tables via Prisma..."
+$DC -f docker-compose.prod.yml run --rm order-orchestrator npx prisma db push --skip-generate || true
+$DC -f docker-compose.prod.yml run --rm payment-service npx prisma db push --skip-generate || true
+$DC -f docker-compose.prod.yml run --rm restaurant-service npx prisma db push --skip-generate || true
+$DC -f docker-compose.prod.yml run --rm delivery-service npx prisma db push --skip-generate || true
+
+# 10. Start Microservices & Frontend
 echo "🚀 Starting Microservices & Frontend..."
 $DC -f docker-compose.prod.yml up -d --force-recreate
-
-echo "⏳ Waiting for microservices to connect..."
-sleep 10
-
-# 10. Push Prisma database schemas
-echo "🗄️ Initializing database tables via Prisma..."
-sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
-sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
-sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate || true
-sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate || true
-
-# 11. Restart microservices cleanly
-echo "🔄 Restarting microservices..."
-$DC -f docker-compose.prod.yml restart order-orchestrator payment-service restaurant-service delivery-service api-gateway
 
 echo "🎉 Deployment complete!"
 echo "🌐 Access your app at: http://$PUBLIC_IP"

@@ -39,10 +39,23 @@ async function handleMessage(event: DeliveryCommand): Promise<void> {
   }
 }
 
+async function connectDbWithRetry(retries = 15, delayMs = 3000): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await prisma.$connect();
+      console.log('[Delivery] Database connected');
+      return;
+    } catch (err) {
+      console.warn(`[Delivery] Waiting for database (attempt ${i + 1}/${retries})...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error('[Delivery] Database connection timeout');
+}
+
 async function start() {
   try {
-    await prisma.$connect();
-    console.log('[Delivery] Database connected');
+    await connectDbWithRetry();
 
     await connectProducer();
     await connectConsumer(handleMessage);

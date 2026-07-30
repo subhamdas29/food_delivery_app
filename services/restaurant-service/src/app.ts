@@ -32,8 +32,6 @@ app.get('/health', async (_req, res) => {
 });
 
 async function handleMessage(event: ConfirmOrder): Promise<void> {
-  // First check if we should reject (rollback path testing)
-  // then fall through to confirm if not rejected
   const rejectionRate = parseFloat(process.env.RESTAURANT_REJECTION_RATE ?? '0');
   const shouldReject = Math.random() < rejectionRate;
 
@@ -43,10 +41,23 @@ async function handleMessage(event: ConfirmOrder): Promise<void> {
   return handleConfirmOrder(event);
 }
 
+async function connectDbWithRetry(retries = 15, delayMs = 3000): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await prisma.$connect();
+      console.log('[Restaurant] Database connected');
+      return;
+    } catch (err) {
+      console.warn(`[Restaurant] Waiting for database (attempt ${i + 1}/${retries})...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error('[Restaurant] Database connection timeout');
+}
+
 async function start() {
   try {
-    await prisma.$connect();
-    console.log('[Restaurant] Database connected');
+    await connectDbWithRetry();
 
     await connectProducer();
     await connectConsumer(handleMessage);

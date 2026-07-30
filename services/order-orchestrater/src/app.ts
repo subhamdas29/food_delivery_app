@@ -12,7 +12,6 @@ const PORT = process.env.ORCHESTRATOR_PORT ?? 3001;
 
 app.use(express.json());
 
-
 app.get('/health', async (_req, res) => {
   let dbStatus: 'ok' | 'error' = 'ok';
   try {
@@ -27,13 +26,12 @@ app.get('/health', async (_req, res) => {
     timestamp: new Date().toISOString(),
     checks: {
       database: dbStatus,
-      kafka: 'ok', // consumer running means kafka is ok
+      kafka: 'ok',
     },
   };
 
   res.status(response.status === 'ok' ? 200 : 503).json(response);
 });
-
 
 app.get('/orders/:id/status', async (req, res) => {
   try {
@@ -59,11 +57,23 @@ app.get('/orders/:id/status', async (req, res) => {
   }
 });
 
+async function connectDbWithRetry(retries = 15, delayMs = 3000): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await prisma.$connect();
+      console.log('[Orchestrator] Database connected');
+      return;
+    } catch (err) {
+      console.warn(`[Orchestrator] Waiting for database (attempt ${i + 1}/${retries})...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error('[Orchestrator] Database connection timeout');
+}
 
 async function start() {
   try {
-    await prisma.$connect();
-    console.log('[Orchestrator] Database connected');
+    await connectDbWithRetry();
 
     await connectProducer();
     await connectConsumer(handleEvent);
@@ -77,7 +87,6 @@ async function start() {
   }
 }
 
-
 async function shutdown() {
   console.log('[Orchestrator] Shutting down gracefully...');
   await disconnectConsumer();
@@ -86,7 +95,7 @@ async function shutdown() {
   process.exit(0);
 }
 
-process.on('SIGTERM', shutdown); // Signal Terminate; triggered by automated systems like docker, kubernetes, AWS
-process.on('SIGINT', shutdown); // Signal Interrupt; triggered by ctrl+c
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 start();
