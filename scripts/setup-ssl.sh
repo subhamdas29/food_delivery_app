@@ -2,20 +2,29 @@
 set -e
 
 PUBLIC_IP=$(curl -s http://checkip.amazonaws.com || curl -s ifconfig.me)
-# Convert 3.235.52.177 -> 3-235-52-177.sslip.io (Free DNS pointing to your EC2 IP)
 DOMAIN="${PUBLIC_IP//./-}.sslip.io"
 
 echo "🔒 Setting up free HTTPS SSL certificate for domain: $DOMAIN..."
 
-# 1. Open port 443 in firewall if needed
-sudo ufw allow 443/tcp || true
+# 1. Stop host nginx service & pause frontend container to free port 80 for Certbot
+sudo systemctl stop nginx || true
+sudo systemctl disable nginx || true
+sudo docker stop foodrush-frontend || true
 
 # 2. Install Certbot
 sudo apt-get update -y
-sudo apt-get install -y certbot python3-certbot-nginx
+sudo apt-get install -y certbot
 
-# 3. Request free Let's Encrypt SSL certificate
-sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m dev@foodrush.com --redirect || true
+# 3. Request free Let's Encrypt SSL certificate in standalone mode
+sudo certbot certonly --standalone -d $DOMAIN --non-interactive --agree-tos -m dev@foodrush.com || true
 
-echo "🎉 HTTPS SSL setup complete!"
-echo "🌐 Your secure website is now live at: https://$DOMAIN"
+# 4. Ensure host nginx stays stopped so Docker container can use port 80
+sudo systemctl stop nginx || true
+sudo systemctl disable nginx || true
+
+# 5. Start Docker frontend container back up
+sudo docker start foodrush-frontend || true
+
+echo "🎉 SSL Certificate obtained!"
+echo "🌐 Restarting app deployment..."
+./scripts/deploy-aws.sh
