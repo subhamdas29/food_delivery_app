@@ -8,6 +8,9 @@ export const apiClient = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
 });
 
@@ -55,6 +58,7 @@ export async function placeOrder(payload: PlaceOrderPayload): Promise<PlaceOrder
 
 export async function fetchOrderStatus(orderId: string): Promise<OrderStatusResponse> {
   await ensureAuthToken();
-  const response = await apiClient.get<OrderStatusResponse>(`/orders/${orderId}/status`);
+  // Append timestamp query parameter to defeat browser/proxy HTTP caching
+  const response = await apiClient.get<OrderStatusResponse>(`/orders/${orderId}/status?_t=${Date.now()}`);
   return response.data;
 }

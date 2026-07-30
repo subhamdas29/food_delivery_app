@@ -96,12 +96,17 @@ router.get(
   '/:id/status',
   authMiddleware,
   async (req: AuthRequest, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const { id } = req.params;
     const orchestratorUrl = process.env.ORCHESTRATOR_URL ?? 'http://order-orchestrator:3001';
 
     try {
       const response = await fetch(`${orchestratorUrl}/orders/${id}/status`, {
         signal: AbortSignal.timeout(5000),
+        headers: { 'Cache-Control': 'no-cache' },
       });
 
       if (response.ok) {

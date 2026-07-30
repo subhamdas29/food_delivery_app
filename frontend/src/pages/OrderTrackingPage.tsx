@@ -21,7 +21,7 @@ export const OrderTrackingPage: React.FC = () => {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
 
-  // TanStack Query for polling order status every 2500ms
+  // TanStack Query for polling order status every 1500ms
   const { data: orderData, isLoading, isError, error } = useQuery({
     queryKey: ['orderStatus', orderId],
     queryFn: () => fetchOrderStatus(orderId!),
@@ -32,9 +32,11 @@ export const OrderTrackingPage: React.FC = () => {
       if (status === 'COMPLETED' || status === 'FAILED' || status === 'COMPENSATING') {
         return false;
       }
-      return 2500;
+      return 1500;
     },
     staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
     retry: 1,
   });
 

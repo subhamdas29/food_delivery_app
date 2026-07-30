@@ -83,7 +83,7 @@ app.post('/orders', async (req, res) => {
           });
         }
       } catch (e) { console.warn(e); }
-    }, 2000);
+    }, 1500);
 
     setTimeout(async () => {
       try {
@@ -100,7 +100,7 @@ app.post('/orders', async (req, res) => {
           });
         }
       } catch (e) { console.warn(e); }
-    }, 4500);
+    }, 3500);
 
     setTimeout(async () => {
       try {
@@ -117,7 +117,7 @@ app.post('/orders', async (req, res) => {
           });
         }
       } catch (e) { console.warn(e); }
-    }, 7000);
+    }, 5500);
 
     return res.status(201).json({ orderId, status: 'PAYMENT_PROCESSING' });
   } catch (err) {
@@ -127,6 +127,10 @@ app.post('/orders', async (req, res) => {
 });
 
 app.get('/orders/:id/status', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
