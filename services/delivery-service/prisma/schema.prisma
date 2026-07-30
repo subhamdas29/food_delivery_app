@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/client"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,25 +10,25 @@ datasource db {
 }
 
 model Delivery {
-  id                   String         @id @default(uuid())
-  orderId              String         @unique
-  riderId              String?
-  riderName            String?
-  status               DeliveryStatus @default(PENDING)
-  deliveryAddress      Json
+  id                    String         @id @default(uuid())
+  orderId               String         @unique
+  riderId               String?
+  riderName             String?
+  status                DeliveryStatus @default(PENDING)
+  deliveryAddress       Json
   estimatedDeliveryMins Int?
-  failureReason        String?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  failureReason         String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 }
 
 model Rider {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   phone       String
-  isAvailable Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum DeliveryStatus {

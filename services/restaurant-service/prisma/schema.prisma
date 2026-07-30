@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/client"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,25 +10,25 @@ datasource db {
 }
 
 model RestaurantOrder {
-  id           String              @id @default(uuid())
-  orderId      String              @unique
-  restaurantId String
-  status       RestaurantOrderStatus @default(PENDING)
-  rejectionReason String?
+  id                String                @id @default(uuid())
+  orderId           String                @unique
+  restaurantId      String
+  status            RestaurantOrderStatus @default(PENDING)
+  rejectionReason   String?
   estimatedPrepMins Int?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
-  items        RestaurantOrderItem[]
+  items RestaurantOrderItem[]
 }
 
 model RestaurantOrderItem {
-  id              String          @id @default(uuid())
+  id                String @id @default(uuid())
   restaurantOrderId String
-  itemId          String
-  name            String
-  quantity        Int
-  unitPrice       Int
+  itemId            String
+  name              String
+  quantity          Int
+  unitPrice         Int
 
   restaurantOrder RestaurantOrder @relation(fields: [restaurantOrderId], references: [id])
 }
