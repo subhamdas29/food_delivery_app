@@ -123,12 +123,13 @@ async function onPaymentSuccessful(event: PaymentSuccessful): Promise<void> {
         });
     });
 
+    const originalEvent = saga.currentEventPayload as unknown as OrderPlaced;
     const orderPlacedPayload: OrderPlaced = {
         type: "OrderPlaced",
         orderId: order.id,
         userId: order.userId,
         restaurantId: order.restaurantId,
-        items: [],
+        items: originalEvent?.items ?? [],
         totalAmount: order.totalAmount,
         currency: order.currency,
         createdAt: order.createdAt.toISOString(),
@@ -173,12 +174,13 @@ async function onOrderConfirmed(event: OrderConfirmed): Promise<void> {
     const order = await prisma.order.findUniqueOrThrow({
         where: { id: event.orderId },
     });
+    const originalEvent = saga.currentEventPayload as unknown as OrderPlaced;
     const orderPlacedPayload: OrderPlaced = {
         type: 'OrderPlaced',
         orderId: order.id,
         userId: order.userId,
         restaurantId: order.restaurantId,
-        items: [],
+        items: originalEvent?.items ?? [],
         totalAmount: order.totalAmount,
         currency: order.currency,
         createdAt: order.createdAt.toISOString(),

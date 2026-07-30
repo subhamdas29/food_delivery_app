@@ -18,7 +18,7 @@ export async function connectConsumer(
       });
 
       await consumer.connect();
-      await consumer.subscribe({ topic: 'restaurant.commands', fromBeginning: false });
+      await consumer.subscribe({ topic: 'restaurant.commands', fromBeginning: true });
 
       await consumer.run({
         eachMessage: async (payload: EachMessagePayload) => {

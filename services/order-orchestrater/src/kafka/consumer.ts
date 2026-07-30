@@ -27,7 +27,7 @@ export async function connectConsumer(
       await consumer.connect();
 
       for (const topic of SUBSCRIBED_TOPICS) {
-        await consumer.subscribe({ topic, fromBeginning: false });
+        await consumer.subscribe({ topic, fromBeginning: true });
       }
 
       await consumer.run({
