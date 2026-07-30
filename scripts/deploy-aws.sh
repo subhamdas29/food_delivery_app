@@ -83,23 +83,19 @@ $DC -f docker-compose.prod.yml build restaurant-service
 $DC -f docker-compose.prod.yml build delivery-service
 $DC -f docker-compose.prod.yml build frontend
 
-# 8. Start Database & Kafka first
-echo "🚀 Starting Database & Kafka..."
-$DC -f docker-compose.prod.yml up -d postgres kafka kafka-init
+# 8. Start all services
+echo "🚀 Starting Microservices, Postgres & Kafka..."
+$DC -f docker-compose.prod.yml up -d --force-recreate
 
-echo "⏳ Waiting 15 seconds for PostgreSQL databases to initialize..."
+echo "⏳ Waiting 15 seconds for containers to initialize..."
 sleep 15
 
-# 9. Initialize database tables via Prisma before starting service containers
+# 9. Push Prisma database schemas
 echo "🗄️ Initializing database tables via Prisma..."
-$DC -f docker-compose.prod.yml run --rm order-orchestrator npx prisma db push --skip-generate || true
-$DC -f docker-compose.prod.yml run --rm payment-service npx prisma db push --skip-generate || true
-$DC -f docker-compose.prod.yml run --rm restaurant-service npx prisma db push --skip-generate || true
-$DC -f docker-compose.prod.yml run --rm delivery-service npx prisma db push --skip-generate || true
-
-# 10. Start Microservices & Frontend
-echo "🚀 Starting Microservices & Frontend..."
-$DC -f docker-compose.prod.yml up -d --force-recreate
+sudo docker exec foodrush-order-orchestrator npx prisma db push --skip-generate || true
+sudo docker exec foodrush-payment-service npx prisma db push --skip-generate || true
+sudo docker exec foodrush-restaurant-service npx prisma db push --skip-generate || true
+sudo docker exec foodrush-delivery-service npx prisma db push --skip-generate || true
 
 echo "🎉 Deployment complete!"
 echo "🌐 Access your app at: http://$PUBLIC_IP"

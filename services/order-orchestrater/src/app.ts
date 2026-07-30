@@ -47,12 +47,13 @@ app.get('/orders/:id/status', async (req, res) => {
     return res.json({
       orderId: order.id,
       status: order.status,
-      currentStep: order.sagaState?.currentStep,
+      currentStep: order.sagaState?.currentStep ?? 'PAYMENT',
       failureReason: order.sagaState?.failureReason ?? null,
       createdAt: order.createdAt,
       completedAt: order.completedAt ?? null,
     });
   } catch (err) {
+    console.error('[Orchestrator] Error fetching order status:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
