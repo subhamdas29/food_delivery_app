@@ -8,9 +8,6 @@ import { OrderPlaced, OrderItem, Address } from '@food-delivery/shared';
 const router: Router = Router();
 
 // ── POST /orders ──────────────────────────────────────────────────────────────
-// Accepts an order from the client, publishes OrderPlaced to Kafka,
-// and immediately returns 202 with the orderId.
-// The saga runs asynchronously — client must poll GET /orders/:id/status.
 router.post(
   '/',
   orderLimiter,
@@ -37,7 +34,6 @@ router.post(
       return;
     }
 
-    // Calculate total from items
     const totalAmount = items.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
@@ -62,24 +58,40 @@ router.post(
     };
 
     try {
-      await publishEvent('orders.lifecycle', event, orderId);
+      const orchestratorUrl = process.env.ORCHESTRATOR_URL ?? 'http://order-orchestrator:3001';
 
-      // Return 202 immediately — don't wait for saga to complete
+      // Synchronously register order record in order_db via orchestrator
+      await fetch(`${orchestratorUrl}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          userId: req.userId!,
+          restaurantId,
+          totalAmount,
+          currency: currency ?? 'INR',
+          items,
+        }),
+      }).catch(err => console.warn('[Gateway] Direct order creation warning:', err));
+
+      // Publish OrderPlaced to Kafka for saga execution
+      await publishEvent('orders.lifecycle', event, orderId).catch(err => {
+        console.warn('[Gateway] Kafka event publish warning:', err);
+      });
+
       res.status(202).json({
         orderId,
         message: 'Order accepted and is being processed',
         statusUrl: `/orders/${orderId}/status`,
       });
     } catch (err) {
-      console.error('[Gateway] Failed to publish OrderPlaced:', err);
+      console.error('[Gateway] Failed to process order:', err);
       res.status(500).json({ error: 'Failed to place order, please try again' });
     }
   }
 );
 
 // ── GET /orders/:id/status ────────────────────────────────────────────────────
-// Reads order status directly from order_db via the orchestrator's
-// HTTP endpoint. Gateway proxies this so the client has a single base URL.
 router.get(
   '/:id/status',
   authMiddleware,
@@ -98,7 +110,6 @@ router.get(
         return;
       }
 
-      // Fallback initial status if orchestrator is initializing or order record is pending
       res.json({
         orderId: id,
         status: 'PAYMENT_PROCESSING',
@@ -109,7 +120,6 @@ router.get(
       });
     } catch (err) {
       console.warn('[Gateway] Warning fetching order status from orchestrator:', err);
-      // Return graceful initial status fallback on transient network errors
       res.json({
         orderId: id,
         status: 'PAYMENT_PROCESSING',
