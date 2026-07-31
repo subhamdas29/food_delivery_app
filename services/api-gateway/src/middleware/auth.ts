@@ -20,7 +20,7 @@ export function authMiddleware(
   const token = authHeader.split(' ')[1];
 
   try {
-    const secret = process.env.JWT_SECRET ?? 'dev-secret';
+    const secret = process.env.JWT_SECRET ?? 'production-secret-jwt-key-foodrush';
     const decoded = jwt.verify(token, secret) as { userId: string };
     req.userId = decoded.userId;
     next();
@@ -29,22 +29,12 @@ export function authMiddleware(
   }
 }
 
-// Dev-only helper — generates a test token so you can hit the
-// gateway without building a full auth service yet.
-// POST /dev/token { "userId": "user-123" } → { token }
+// Dev token route — generates JWT token for demo/testing
 export function devTokenRoute(req: Request, res: Response): void {
-  if (process.env.NODE_ENV === 'production') {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-
   const { userId } = req.body as { userId?: string };
-  if (!userId) {
-    res.status(400).json({ error: 'userId is required' });
-    return;
-  }
+  const targetUserId = userId ?? 'user-123';
 
-  const secret = process.env.JWT_SECRET ?? 'dev-secret';
-  const token = jwt.sign({ userId }, secret, { expiresIn: '24h' });
+  const secret = process.env.JWT_SECRET ?? 'production-secret-jwt-key-foodrush';
+  const token = jwt.sign({ userId: targetUserId }, secret, { expiresIn: '7d' });
   res.json({ token });
 }

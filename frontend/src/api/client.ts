@@ -26,6 +26,25 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Auto-recover from 401 Unauthorized by clearing stale tokens & re-authenticating
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && !error.config._retry) {
+      error.config._retry = true;
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      try {
+        const newToken = await ensureAuthToken();
+        error.config.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(error.config);
+      } catch (e) {
+        console.error('Failed to auto-refresh token after 401:', e);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Function to ensure dev authentication token is available
 export async function ensureAuthToken(): Promise<string> {
   const existingToken = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -45,6 +64,7 @@ export async function ensureAuthToken(): Promise<string> {
     throw new Error('No token returned from dev token endpoint');
   } catch (error) {
     console.error('Failed to auto-fetch dev authentication token:', error);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     throw error;
   }
 }
