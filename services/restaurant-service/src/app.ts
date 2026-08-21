@@ -4,7 +4,7 @@ import { PrismaClient } from './generated/client';
 import { connectProducer, disconnectProducer } from './kafka/producer';
 import { connectConsumer, disconnectConsumer } from './kafka/consumer';
 import { handleConfirmOrder } from './handlers/confirmOrder';
-import { handleConfirmOrRejectOrder } from './handlers/rejectOrder';
+import { handleRejectOrder } from './handlers/rejectOrder';
 import { ConfirmOrder, HealthCheckResponse } from '@food-delivery/shared';
 
 const app = express();
@@ -32,11 +32,13 @@ app.get('/health', async (_req, res) => {
 });
 
 async function handleMessage(event: ConfirmOrder): Promise<void> {
-  const rejectionRate = parseFloat(process.env.RESTAURANT_REJECTION_RATE ?? '0');
+  const envRate = parseFloat(process.env.RESTAURANT_REJECTION_RATE ?? '0');
+  const isTestRejectRestaurant = event.restaurantId === 'rest-reject-test';
+  const rejectionRate = isTestRejectRestaurant ? 0.3 : envRate;
   const shouldReject = Math.random() < rejectionRate;
 
   if (shouldReject) {
-    return handleConfirmOrRejectOrder(event);
+    return handleRejectOrder(event);
   }
   return handleConfirmOrder(event);
 }

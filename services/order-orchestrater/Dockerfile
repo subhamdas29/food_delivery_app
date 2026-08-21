@@ -14,6 +14,7 @@ RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @food-delivery/shared build
 RUN cd services/order-orchestrater && npx prisma generate
 RUN pnpm --filter @food-delivery/order-orchestrator build
+RUN cp -r services/order-orchestrater/src/generated services/order-orchestrater/dist/generated
 
 WORKDIR /app/services/order-orchestrater
 

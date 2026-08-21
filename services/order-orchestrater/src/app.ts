@@ -67,57 +67,7 @@ app.post('/orders', async (req, res) => {
       });
     });
 
-    // Background saga advancer timer to ensure order completes smoothly
-    setTimeout(async () => {
-      try {
-        const o = await prisma.order.findUnique({ where: { id: orderId } });
-        if (o && o.status === OrderStatus.PAYMENT_PROCESSING) {
-          console.log(`[Sync Advancer] Moving order ${orderId} -> RESTAURANT_CONFIRMING`);
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { status: OrderStatus.RESTAURANT_CONFIRMING },
-          });
-          await prisma.sagaState.update({
-            where: { orderId },
-            data: { currentStep: SagaStep.RESTAURANT_CONFIRMATION },
-          });
-        }
-      } catch (e) { console.warn(e); }
-    }, 1500);
-
-    setTimeout(async () => {
-      try {
-        const o = await prisma.order.findUnique({ where: { id: orderId } });
-        if (o && o.status === OrderStatus.RESTAURANT_CONFIRMING) {
-          console.log(`[Sync Advancer] Moving order ${orderId} -> RIDER_ASSIGNING`);
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { status: OrderStatus.RIDER_ASSIGNING },
-          });
-          await prisma.sagaState.update({
-            where: { orderId },
-            data: { currentStep: SagaStep.RIDER_ASSIGNMENT },
-          });
-        }
-      } catch (e) { console.warn(e); }
-    }, 3500);
-
-    setTimeout(async () => {
-      try {
-        const o = await prisma.order.findUnique({ where: { id: orderId } });
-        if (o && (o.status === OrderStatus.RIDER_ASSIGNING || o.status === OrderStatus.RESTAURANT_CONFIRMING)) {
-          console.log(`[Sync Advancer] Moving order ${orderId} -> COMPLETED`);
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { status: OrderStatus.COMPLETED, completedAt: new Date() },
-          });
-          await prisma.sagaState.update({
-            where: { orderId },
-            data: { currentStep: SagaStep.COMPLETED, status: SagaStatus.COMPLETED },
-          });
-        }
-      } catch (e) { console.warn(e); }
-    }, 5500);
+    return res.status(201).json({ orderId, status: 'PAYMENT_PROCESSING' });
 
     return res.status(201).json({ orderId, status: 'PAYMENT_PROCESSING' });
   } catch (err) {
