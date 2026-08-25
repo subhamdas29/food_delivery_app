@@ -12,8 +12,13 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.23.1",
+    "axios": "^1.6.8",
     "eslint": "^9.0.0",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.23.0",
     "prettier": "^3.0.0",
+    "ts-node": "^10.9.2",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },

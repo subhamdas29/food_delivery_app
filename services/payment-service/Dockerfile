@@ -14,6 +14,7 @@ RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @food-delivery/shared build
 RUN cd services/payment-service && npx prisma generate
 RUN pnpm --filter @food-delivery/payment-service build
+RUN cp -r services/payment-service/src/generated services/payment-service/dist/generated
 
 WORKDIR /app/services/payment-service
 
